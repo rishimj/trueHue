@@ -1,199 +1,166 @@
-# trueHue: AI-Powered Veneer Validator
+# TrueHue: Veneer Color Validator
 
-The AI-Powered Veneer Validator is a mobile application designed to assist quality assurance and field engineers in validating wood veneer colors against Steelcase specifications. This tool streamlines the inspection process while improving accuracy and consistency through artificial intelligence.
+TrueHue checks whether a wood veneer sample matches its finish specification from a single photo. Quality assurance and field engineers photograph a sample, pick the finish, and get an in-range or out-of-range verdict with the closest shade category in seconds.
 
-## Client: Steelcase Inc.
+It runs as a web app, and the same codebase builds native iOS and Android apps with Expo.
 
-This project was developed for [Steelcase Inc.](https://www.steelcase.com/), a global leader in office furniture, interior architecture and space solutions for offices, hospitals and classrooms. Steelcase is renowned for their innovative research in workspace design and has been creating furniture solutions that enhance the way people work since 1912. Their commitment to quality and precision in manufacturing makes accurate color validation crucial for maintaining their high standards across their wood veneer products.
-
-<p align="center">
-<img src="image.png" alt="Steelcase Logo" width="400">
-</p>
-
-## Validation Results
-
-Our AI-powered validation system provides accurate and reliable results for wood veneer color classification:
+**Live demo:** _add your Azure URL here after running `./deploy/azure-deploy.sh`_
 
 <p align="center">
-<img src="validationResults.jpeg" alt="Validation Results Example" width="400">
+  <img src="docs/images/analyze.png" alt="Analyzing a Desert Oak sample" width="300">
+  &nbsp;&nbsp;
+  <img src="docs/images/compare.png" alt="Comparing two veneer samples" width="300">
 </p>
 
-- **Medium Cherry (121 samples)**: 81.82% overall accuracy (99/121), with 87.18% in‑range match and 72.09% out‑of‑range detection.  
-- **Desert Oak (110 samples)**: 92.73% overall accuracy (102/110), achieving a flawless 100% in‑range match and 82.98% out‑of‑range detection.  
-- **Graphite Walnut (149 samples)**: 92.62% overall accuracy (138/149), boasting 94.51% in‑range match and 89.66% out‑of‑range detection.  
-- **Robust Across All Finishes**: Two species exceed 92% accuracy and one exceeds 80%, highlighting the model’s versatility on diverse wood veneers.  
-- **Transforming Steelcase QA**: Enables reliable, automated color verification, slashing manual inspection time while ensuring consistent, high‑quality finish standards. 
+## Built for Steelcase
 
+TrueHue was developed for [Steelcase Inc.](https://www.steelcase.com/), a global leader in office furniture and workspace design. Consistent veneer color is critical to Steelcase's finish standards, and manual visual inspection is slow and subjective. TrueHue makes that check fast, repeatable, and recorded.
 
-## Documentation Links
+## Features
 
-- [Installation Guide](Installation-Guide.pdf)
-- [Detailed Design Document (PDF)](JIC-4307-Final-Report-Color-Validator.pdf)
+- **Validate a sample** against Medium Cherry, Desert Oak, or Graphite Walnut. See the verdict, the predicted shade category (too light, light, standard, dark, too dark), a confidence score, and how similar the sample is to every category.
+- **Compare two samples** side by side to measure how closely their colors match.
+- **Save and browse reports** in the cloud (Firebase), with filters by date, finish, and result, plus sharing.
+- **Five languages** (English, Spanish, French, German, Chinese), a dark mode, and optional notifications on mobile.
 
-## Prerequisites
+## Results
 
-- Computer
-- Internet connection
+Accuracy of the in-range / out-of-range verdict across the full labeled dataset of 380 photos:
 
-## Software Installation
+| Finish          | Samples | Overall | In-range samples | Out-of-range samples |
+| --------------- | ------: | ------: | ---------------: | -------------------: |
+| Desert Oak      |     110 |   92.7% |           100.0% |                83.0% |
+| Graphite Walnut |     149 |   91.9% |            93.4% |                89.7% |
+| Medium Cherry   |     121 |   79.3% |            84.6% |                69.8% |
 
-### 1. Install VSCode
+These numbers are enforced by an automated test (`backend/tests/test_accuracy.py`), so a change that degrades the classifier fails CI.
 
-1. Download VSCode from: <https://code.visualstudio.com/download>
-2. Follow the installation instructions for macOS
+## How it works
 
-### 2. Install Homebrew
+1. The photo is resized to 300 x 300 and compared pixel by pixel with 20 reference photos from each of the five shade categories of the chosen finish. The mean RGB distance to each category forms the sample's **distance profile**.
+2. That profile is compared with reference profiles computed from the labeled dataset (`backend/data/profiles`). The closest reference profile gives the predicted category, and the category determines whether the sample is in range.
+3. **Confidence** shows how clearly the closest category beats the closest category on the other side of the range limit (50% means a tie, 100% means no contest).
 
-1. Open Terminal and run:
-   ```bash
-   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-   ```
-2. If Xcode doesn't exist, run:
-   ```bash
-   xcode-select --install
-   ```
+Reference photos are decoded once at startup (or precomputed into a cache during the Docker build), so each analysis takes about a quarter of a second.
 
-### 3. Install Git
+## Architecture
 
-1. Using Homebrew, install Git:
-   ```bash
-   brew install git
-   ```
-2. Verify installation:
-   ```bash
-   git --version
-   ```
-
-### 4. Install Docker
-
-1. Download Docker from: <https://www.docker.com/get-started/>
-2. Alternatively, install via Terminal:
-   ```bash
-   brew install --cask docker
-   ```
-3. Verify installation:
-   ```bash
-   docker --version
-   ```
-4. Open Docker desktop application
-
-## Application Setup
-
-### 1. Clone Repository
-
-```bash
-git clone https://github.com/JDA-4307/JIC_4307_ColorValidation.git
+```
+Browser / iOS / Android  (Expo + React Native, TypeScript)
+        │  POST /api/classify, /api/compare
+        ▼
+Flask API  (Python, NumPy, Pillow)  ── also serves the web build
+        │
+Firebase  (Firestore for reports, Storage for report photos)
 ```
 
-### 2. Configure Local Settings
+In production a single container serves both the web app and the API, so the site and API share one URL with no CORS or configuration to manage.
 
-1. Open the cloned folder in VSCode
-2. Locate the `config.js` file
-3. Get your local IP address:
-   ```bash
-   ipconfig getifaddr en0
-   ```
-4. Update the `API_URL` in `config.js`:
-   ```javascript
-   API_URL = "http://<your_local_ip>:3050";
-   ```
+## Project structure
 
-### 3. Start Backend Services
+```
+.
+├── TrueHue/                 # Expo app (web, iOS, Android)
+│   ├── app/(tabs)/          # Screens: Analyze, Compare, Reports, Settings
+│   ├── components/ui.tsx    # Shared UI components
+│   ├── lib/                 # API client, Firebase, settings and theming
+│   └── i18n/strings.ts      # UI text in five languages
+├── backend/
+│   ├── app/                 # Flask app and classifier
+│   ├── data/                # Reference photos and reference profiles
+│   ├── scripts/             # Reference cache builder
+│   └── tests/               # API and accuracy tests
+├── deploy/azure-deploy.sh   # One-command Azure deployment
+├── Dockerfile               # Production image (web build + API)
+└── docs/                    # Final report and original v1 installation guide
+```
 
-1. Open the `docker-compose.yml` file in VSCode
-2. Press the **Run All Services** button above the services section
-3. Wait for container installation to complete (check Docker Desktop to confirm)
+## Getting started
 
-### 4. Start Frontend Application
+Prerequisites: [Python 3.11+](https://www.python.org/downloads/) and [Node.js 20+](https://nodejs.org/). On macOS (including Apple Silicon):
 
-1. In VSCode Terminal, navigate to the TrueHue folder:
-   ```bash
-   cd TrueHue
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the application:
-   ```bash
-   npx expo start
-   ```
+```bash
+brew install python@3.12 node@20
+```
 
-### 5. Run the Application
+### 1. Run the API
 
-Choose your preferred method:
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+python wsgi.py            # http://localhost:3050
+```
 
-- Web browser: Press `w`
-- iOS simulator: Press `i`
-- Android simulator: Press `a`
-- Mobile device: Scan the QR code with the Expo Go app
+### 2. Run the app
 
-## Troubleshooting
+In a second terminal:
 
-- If Docker services fail to start, check that Docker Desktop is running.
-- If you encounter dependency issues, try running `npm install` again.
-- For connection issues, verify that your IP address is correctly configured in `config.js`.
+```bash
+cd TrueHue
+npm install
+EXPO_PUBLIC_API_URL=http://localhost:3050 npx expo start
+```
 
-## Release Notes v1.0.0
+Press `w` to open it in a browser, or scan the QR code with [Expo Go](https://expo.dev/go). On a physical phone, replace `localhost` with your computer's local IP address (`ipconfig getifaddr en0` on macOS).
 
-#### Key Features
+### Or run everything with Docker
 
-### Color Analysis
+```bash
+docker compose up --build   # http://localhost:8000
+```
 
-- Real-time validation of wood veneer samples against predefined Steelcase color specifications
-- Support for three wood veneer types: Medium Cherry, Desert Oak, and Graphite Walnut
-- Confidence scoring system indicating reliability of each validation result
-- Clear pass/fail determination with "in range" or "out of range" indicators
+## Testing
 
-### User-Friendly Image Capture
+```bash
+cd backend && python -m pytest                # API tests and accuracy checks
+cd backend && python -m pytest -m "not slow"  # skip the full-dataset accuracy run
+cd TrueHue && npm run typecheck
+```
 
-- Take photos directly within the app
-- Select existing images from device gallery
-- Preview functionality to ensure proper sample capture before analysis
-- Option to retake or select new images if needed
+GitHub Actions runs the backend tests, the TypeScript check, and the web build on every push and pull request.
 
-### Dual Analysis Options
+## Deploying to Azure
 
-- Quick "Analyze" option for instantaneous classification
-- Comprehensive "Generate Report" option for detailed analysis across all veneer types
+The app deploys to [Azure Container Apps](https://learn.microsoft.com/azure/container-apps/) with one command. The image is built in the cloud, so it works the same from an Apple Silicon Mac.
 
-### Robust Report Management
+```bash
+brew install azure-cli
+az login
+./deploy/azure-deploy.sh
+```
 
-- Save validation results for future reference
-- Browse historical validations in reverse chronological order
-- Filter reports by date (day/month/year)
-- Filter reports by wood veneer type
-- View confidence percentages for all saved validations
+The script prints the public URL when the app is ready. Run it again to deploy updates. The app scales to zero when idle, so the first request after a quiet period takes a few extra seconds.
 
-### Intuitive Interface
+## API
 
-- Clean, minimalist design focusing on core functionality
-- Bottom navigation bar for easy access to key features
-- Simple three-tab layout: Home, Reports, and Image Picker
+| Method | Path           | Body                                   | Returns                                                                                  |
+| ------ | -------------- | -------------------------------------- | ---------------------------------------------------------------------------------------- |
+| GET    | `/api/health`  |                                        | Status, supported finishes and categories                                                |
+| POST   | `/api/classify`| `{ "image": "<base64>", "wood": "desert-oak" }` | `in_range`, `predicted_category`, `confidence`, `similarity_scores`, `distance_profile` |
+| POST   | `/api/compare` | `{ "image1": "<base64>", "image2": "<base64>" }` | `difference` (mean RGB distance) and `normalized_difference` (0 to 100)          |
 
-### Technical Details
+`wood` is one of `medium-cherry`, `desert-oak`, or `graphite-walnut`. Images may be plain base64 or data URLs.
 
-- Cross-platform compatibility (iOS and Android)
-- Locally processed image analysis for quick results
-- Cloud storage of validation reports for access across devices
-- No login required for basic functionality
+## Known limitations
 
-#### Bug Fixes
+- Lighting matters: strong shadows or color casts can shift results. Photograph samples under consistent, neutral light.
+- Saved reports use a shared Firebase project without user accounts. Add Firebase Authentication and tighten the security rules before storing sensitive data.
 
-- Fixed inconsistent UI displays so only the correct result appears for each analysis.
-- Corrected confidence-score logic to avoid defaulting to 100%, now reflecting actual model certainty.
-- Improved image-decoding, resizing, and feature-extraction pipeline for more reliable inputs.
+## Documentation
 
-#### Known Issues
+- [Final report and detailed design](docs/final-report.pdf)
+- [Original v1.0 installation guide](docs/installation-guide-v1.pdf) (superseded by this README)
 
-- **Lighting Sensitivity**: Extreme shadows or highlights can still skew results; improved normalization is planned for the next sprint.
-- **Security**: No authentication or encryption yet—future releases will add Firebase Authentication and HTTPS.
-- **Planned Enhancements**: Multilingual UI support and push-notification alerts are not included in v1.0.0 but are on the roadmap.
+## Team
 
-## Development Team
+- **Rishi Manimaran**, Project Lead
+- Benson Lin, Frontend Developer
+- Jihoon Kim, Frontend Developer
+- Zhihui Chen, Backend Developer
+- Zuhair Al Araf, Backend Developer
 
-- Rishi Manimaran - Backend Developer
-- Benson Lin - Frontend Developer
-- Jihoon Kim - Frontend Developer
-- Zhihui Chen - Backend Developer
-- Zuhair Al Araf - Backend Developer
+## License
+
+[MIT](LICENSE)

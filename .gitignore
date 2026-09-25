@@ -1,4 +1,27 @@
-node_modules
+# Dependencies
+node_modules/
 
-# Jupyter Notebooks
-*.ipynb
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Build artifacts
+backend/data/references.npz
+
+# Local env
+.env
+.env*.local
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
