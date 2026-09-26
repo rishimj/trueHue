@@ -1,27 +1,43 @@
-# TrueHue: Veneer Color Validator
-
-TrueHue checks whether a wood veneer sample matches its finish specification from a single photo. Quality assurance and field engineers photograph a sample, pick the finish, and get an in-range or out-of-range verdict with the closest shade category in seconds.
-
-It runs as a web app, and the same codebase builds native iOS and Android apps with Expo.
-
-**Live demo:** _add your Azure URL here after running `./deploy/azure-deploy.sh`_
+<h1 align="center">TrueHue</h1>
 
 <p align="center">
-  <img src="docs/images/analyze.png" alt="Analyzing a Desert Oak sample" width="300">
-  &nbsp;&nbsp;
-  <img src="docs/images/compare.png" alt="Comparing two veneer samples" width="300">
+  <strong>Color quality control for wood veneer, from a single photo.</strong><br>
+  Snap a sample, pick the finish, and know in under a second whether it meets spec.
 </p>
 
-## Built for Steelcase
+<p align="center">
+  <a href="https://github.com/rishimj/trueHue/actions/workflows/ci.yml"><img src="https://github.com/rishimj/trueHue/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/accuracy-88%25-2E7D32" alt="88% accuracy">
+  <img src="https://img.shields.io/badge/Expo-React%20Native-000020?logo=expo&logoColor=white" alt="Expo and React Native">
+  <img src="https://img.shields.io/badge/Python-Flask-3776AB?logo=python&logoColor=white" alt="Python and Flask">
+  <img src="https://img.shields.io/badge/deploy-Azure-0078D4?logo=microsoftazure&logoColor=white" alt="Azure">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+</p>
 
-TrueHue was developed for [Steelcase Inc.](https://www.steelcase.com/), a global leader in office furniture and workspace design. Consistent veneer color is critical to Steelcase's finish standards, and manual visual inspection is slow and subjective. TrueHue makes that check fast, repeatable, and recorded.
+<p align="center">
+  <strong>Live demo:</strong> <em>coming soon</em>
+</p>
+
+<p align="center">
+  <img src="docs/images/showcase.png" alt="TrueHue validating a Desert Oak sample, comparing two samples, and listing saved reports" width="100%">
+</p>
+
+## Why TrueHue
+
+Furniture makers promise customers that a "Desert Oak" desk matches the "Desert Oak" cabinet next to it. Today that promise is checked by eye: an inspector holds a sample next to a reference chip and makes a judgment call. It is slow, subjective, and leaves no record.
+
+TrueHue turns that judgment call into a measurement. It was built for [Steelcase Inc.](https://www.steelcase.com/), a global leader in workplace furniture, to validate veneer finishes on the factory floor and in the field.
+
+| 88% accurate | Under a second | Web, iOS, Android | Tested on every change |
+| :---: | :---: | :---: | :---: |
+| across 380 labeled photos of three finishes | about 0.25 s per analysis on one CPU | one codebase for every platform | accuracy tests run in CI |
 
 ## Features
 
-- **Validate a sample** against Medium Cherry, Desert Oak, or Graphite Walnut. See the verdict, the predicted shade category (too light, light, standard, dark, too dark), a confidence score, and how similar the sample is to every category.
-- **Compare two samples** side by side to measure how closely their colors match.
-- **Save and browse reports** in the cloud (Firebase), with filters by date, finish, and result, plus sharing.
-- **Five languages** (English, Spanish, French, German, Chinese), a dark mode, and optional notifications on mobile.
+- **Validate a sample** against Medium Cherry, Desert Oak, or Graphite Walnut. Get a clear in-range or out-of-range verdict, the exact shade category (too light, light, standard, dark, too dark), a confidence score, and a similarity breakdown across every category.
+- **Compare two samples** side by side to see how closely their colors match before parts are paired.
+- **Keep a record.** Save results with the photo to the cloud, then filter by date, finish, and result, or share a report in one tap.
+- **Ready for global teams** with five languages (English, Spanish, French, German, Chinese), dark mode, and completion notifications on mobile.
 
 ## Results
 
@@ -152,14 +168,6 @@ The script prints the public URL when the app is ready. Run it again to deploy u
 
 - [Final report and detailed design](docs/final-report.pdf)
 - [Original v1.0 installation guide](docs/installation-guide-v1.pdf) (superseded by this README)
-
-## Team
-
-- **Rishi Manimaran**, Project Lead
-- Benson Lin, Frontend Developer
-- Jihoon Kim, Frontend Developer
-- Zhihui Chen, Backend Developer
-- Zuhair Al Araf, Backend Developer
 
 ## License
 
