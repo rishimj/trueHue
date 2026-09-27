@@ -107,6 +107,8 @@ export interface ThemeColors {
   text: string;
   secondaryText: string;
   primary: string;
+  /** Tinted background for selected controls. */
+  primarySoft: string;
   border: string;
   track: string;
   success: string;
@@ -116,30 +118,32 @@ export interface ThemeColors {
 
 const LIGHT: ThemeColors = {
   dark: false,
-  background: "#F7F6F3",
+  background: "#F5F2ED",
   card: "#FFFFFF",
-  text: "#2B2A2E",
-  secondaryText: "#6B6A70",
-  primary: "#6A3FD1",
-  border: "#E2E0E8",
-  track: "#EDECF1",
-  success: "#2E7D32",
-  warning: "#E65100",
-  danger: "#C62828",
+  text: "#1D1B18",
+  secondaryText: "#6F685F",
+  primary: "#24473D",
+  primarySoft: "#E4EDE8",
+  border: "#E5DFD5",
+  track: "#EFEAE2",
+  success: "#2F7A4D",
+  warning: "#C0621C",
+  danger: "#B3261E",
 };
 
 const DARK: ThemeColors = {
   dark: true,
-  background: "#121214",
-  card: "#1E1E22",
-  text: "#EDEDF0",
-  secondaryText: "#A0A0A8",
-  primary: "#9B7BFF",
-  border: "#34343A",
-  track: "#2C2C32",
-  success: "#66BB6A",
-  warning: "#FFA726",
-  danger: "#EF5350",
+  background: "#121110",
+  card: "#1C1A18",
+  text: "#F2EEE8",
+  secondaryText: "#A69E93",
+  primary: "#8CC5AE",
+  primarySoft: "#23332D",
+  border: "#302C27",
+  track: "#2A2622",
+  success: "#6CC08A",
+  warning: "#F0A05A",
+  danger: "#EF6B62",
 };
 
 export function useThemeColors(): ThemeColors {

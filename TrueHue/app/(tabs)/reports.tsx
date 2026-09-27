@@ -4,10 +4,10 @@ import { useFocusEffect } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import { Image, Linking, Modal, Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
 
-import { Card, Loader, Screen } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, Loader, Screen, useIsWide } from "@/components/ui";
 import { fetchReports, type Report } from "@/lib/reports";
 import { format, useSettings, useStrings, useThemeColors } from "@/lib/settings";
-import { WOOD_LABEL_KEYS, WOOD_TYPES } from "@/lib/woods";
+import { WOOD_COLORS, WOOD_LABEL_KEYS, WOOD_TYPES } from "@/lib/woods";
 
 interface Filters {
   month: string;
@@ -34,6 +34,7 @@ export default function ReportsScreen() {
   const { settings } = useSettings();
   const t = useStrings();
   const colors = useThemeColors();
+  const wide = useIsWide();
 
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,21 +133,31 @@ export default function ReportsScreen() {
     },
   ];
 
+  const activeFilters = Object.values(filters).filter(Boolean).length;
+
   return (
     <Screen
       title={t.reportsTitle}
+      subtitle={loading ? undefined : format(t.reportCount, { count: filtered.length })}
       headerRight={
-        <Pressable onPress={load} accessibilityLabel={t.refresh} hitSlop={12}>
-          <Ionicons name="refresh" size={24} color={colors.primary} />
-        </Pressable>
+        <Button label={t.refresh} icon="refresh" variant="secondary" onPress={load} disabled={loading} />
       }
     >
-      <Card title={t.filterBy}>
-        <View style={styles.filters}>
+      <Card
+        title={t.filterBy}
+        right={
+          activeFilters > 0 ? (
+            <Pressable onPress={() => setFilters(NO_FILTERS)} hitSlop={8}>
+              <Text style={{ color: colors.primary, fontWeight: "600" }}>{t.clearFilters}</Text>
+            </Pressable>
+          ) : null
+        }
+      >
+        <View style={[styles.filters, wide && styles.filtersWide]}>
           {filterPickers.map(({ key, label, options }) => (
-            <View key={key} style={styles.filter}>
-              <Text style={[styles.filterLabel, { color: colors.text }]}>{label}</Text>
-              <View style={[styles.pickerBox, { borderColor: colors.border }]}>
+            <View key={key} style={[styles.filter, wide && styles.filterWide]}>
+              <Text style={[styles.filterLabel, { color: colors.secondaryText }]}>{label}</Text>
+              <View style={[styles.pickerBox, { borderColor: colors.border, backgroundColor: colors.card }]}>
                 <Picker
                   selectedValue={filters[key]}
                   onValueChange={setFilter(key)}
@@ -168,37 +179,72 @@ export default function ReportsScreen() {
       {loading ? (
         <Loader label={t.loadingReports} />
       ) : error || filtered.length === 0 ? (
-        <Card>
-          <Text style={[styles.empty, { color: colors.secondaryText }]}>
-            {error ? t.loadReportsFailed : t.noReportsMatch}
-          </Text>
-        </Card>
+        <EmptyState
+          icon={error ? "cloud-offline-outline" : "document-text-outline"}
+          title={error ? t.loadReportsFailed : t.noReportsMatch}
+        />
       ) : (
-        filtered.map((report) => (
-          <Card key={report.id} style={styles.report}>
-            <Pressable
-              style={styles.reportBody}
-              disabled={!report.imageUrl}
-              onPress={() => setPreviewImage(report.imageUrl)}
-            >
-              {report.imageUrl ? (
-                <Image source={{ uri: report.imageUrl }} style={styles.thumbnail} />
-              ) : (
-                <View style={[styles.thumbnail, { backgroundColor: colors.track }]} />
-              )}
-              <View style={styles.reportText}>
-                <Text style={[styles.reportWood, { color: colors.text }]}>{woodName(report)}</Text>
-                <Text style={{ color: colors.secondaryText, fontSize: 13 }}>{formatDate(report.date)}</Text>
-                <Text style={{ color: report.inRange ? colors.success : colors.danger, fontWeight: "600" }}>
-                  {report.inRange ? t.inRange : t.outOfRange}
-                </Text>
+        <View style={styles.grid}>
+          {filtered.map((report) => {
+            const tone = report.inRange ? colors.success : colors.warning;
+            return (
+              <View
+                key={report.id}
+                style={[
+                  styles.report,
+                  wide && styles.reportWide,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
+              >
+                <Pressable
+                  style={wide ? undefined : styles.thumbWrap}
+                  disabled={!report.imageUrl}
+                  onPress={() => setPreviewImage(report.imageUrl)}
+                  accessibilityLabel={t.viewImage}
+                >
+                  {report.imageUrl ? (
+                    <Image source={{ uri: report.imageUrl }} style={wide ? styles.cover : styles.thumbnail} />
+                  ) : (
+                    <View style={[wide ? styles.cover : styles.thumbnail, { backgroundColor: colors.track }]} />
+                  )}
+                </Pressable>
+                <View style={[styles.reportText, wide && styles.reportTextWide]}>
+                  <View style={styles.reportTop}>
+                    <View style={styles.woodRow}>
+                      {report.wood ? (
+                        <View style={[styles.swatch, { backgroundColor: WOOD_COLORS[report.wood] }]} />
+                      ) : null}
+                      <Text style={[styles.reportWood, { color: colors.text }]} numberOfLines={1}>
+                        {woodName(report)}
+                      </Text>
+                    </View>
+                    <Pressable onPress={() => share(report)} hitSlop={12} accessibilityLabel={t.share}>
+                      <Ionicons name="share-outline" size={20} color={colors.secondaryText} />
+                    </Pressable>
+                  </View>
+                  <Text style={{ color: colors.secondaryText, fontSize: 13 }}>{formatDate(report.date)}</Text>
+                  <View style={styles.reportMeta}>
+                    <Badge
+                      label={report.inRange ? t.inRange : t.outOfRange}
+                      color={tone}
+                      icon={report.inRange ? "checkmark-circle" : "alert-circle"}
+                    />
+                    {report.confidence != null ? (
+                      <Text style={{ color: colors.secondaryText, fontSize: 13 }}>
+                        {format(t.confidenceShort, { value: Number(report.confidence).toFixed(0) })}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {report.category ? (
+                    <Text style={{ color: colors.secondaryText, fontSize: 13 }} numberOfLines={1}>
+                      {report.category}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
-            </Pressable>
-            <Pressable onPress={() => share(report)} hitSlop={12} accessibilityLabel={t.share}>
-              <Ionicons name="share-outline" size={24} color={colors.primary} />
-            </Pressable>
-          </Card>
-        ))
+            );
+          })}
+        </View>
       )}
 
       <Modal
@@ -218,21 +264,47 @@ export default function ReportsScreen() {
 
 const styles = StyleSheet.create({
   filters: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 12 },
+  filtersWide: { flexWrap: "nowrap", gap: 12 },
   filter: { width: "48%", gap: 6 },
-  filterLabel: { fontSize: 14, fontWeight: "500" },
-  pickerBox: { borderWidth: 1, borderRadius: 8, overflow: "hidden" },
+  filterWide: { flex: 1, width: "auto" },
+  filterLabel: { fontSize: 12, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
+  pickerBox: { borderWidth: 1, borderRadius: 10, overflow: "hidden" },
   picker: Platform.select({
     ios: { height: 120, marginVertical: -40 },
     web: { height: 40, borderWidth: 0, paddingHorizontal: 8, fontSize: 15 },
     default: { height: 50 },
   }),
-  empty: { fontSize: 16, textAlign: "center", paddingVertical: 24 },
-  report: { flexDirection: "row", alignItems: "center", padding: 12 },
-  reportBody: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
-  thumbnail: { width: 56, height: 56, borderRadius: 8 },
-  reportText: { flex: 1, gap: 2 },
-  reportWood: { fontSize: 16, fontWeight: "600" },
-  modal: { flex: 1, backgroundColor: "rgba(0,0,0,0.8)", alignItems: "center", justifyContent: "center" },
-  preview: { width: "90%", height: "70%" },
-  close: { position: "absolute", top: 48, right: 24 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
+  report: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  reportWide: {
+    width: "31.5%",
+    flexGrow: 1,
+    maxWidth: "33%",
+    flexDirection: "column",
+    alignItems: "stretch",
+    padding: 0,
+    gap: 0,
+    overflow: "hidden",
+  },
+  thumbWrap: { borderRadius: 10, overflow: "hidden" },
+  thumbnail: { width: 72, height: 72, borderRadius: 10 },
+  cover: { width: "100%", aspectRatio: 4 / 3 },
+  reportText: { flex: 1, gap: 4 },
+  reportTextWide: { padding: 14 },
+  reportTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  woodRow: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 },
+  swatch: { width: 12, height: 12, borderRadius: 6 },
+  reportWood: { fontSize: 16, fontWeight: "600", flexShrink: 1 },
+  reportMeta: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 },
+  modal: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", alignItems: "center", justifyContent: "center" },
+  preview: { width: "90%", height: "80%" },
+  close: { position: "absolute", top: 32, right: 32 },
 });

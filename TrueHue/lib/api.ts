@@ -32,16 +32,33 @@ export interface Comparison {
   normalized_difference: number;
 }
 
+// Matches the server's MAX_UPLOAD_MB; checked here so an oversized request fails immediately.
+const MAX_REQUEST_BYTES = 25 * 1024 * 1024;
+const REQUEST_TIMEOUT_MS = 60_000;
+
 async function post<T>(path: string, body: unknown): Promise<T> {
+  const payload = JSON.stringify(body);
+  if (payload.length > MAX_REQUEST_BYTES) {
+    throw new Error("This image is too large to analyze. Try a smaller photo.");
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   let response: Response;
   try {
     response = await fetch(`${API_URL}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: payload,
+      signal: controller.signal,
     });
   } catch {
-    throw new Error("Could not reach the analysis server. Check your connection and try again.");
+    throw new Error(
+      controller.signal.aborted
+        ? "The analysis server took too long to respond. Try again."
+        : "Could not reach the analysis server. Check your connection and try again."
+    );
+  } finally {
+    clearTimeout(timeout);
   }
   const data = await response.json().catch(() => null);
   if (!response.ok) {
