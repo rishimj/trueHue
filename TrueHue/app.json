@@ -28,7 +28,7 @@
       "output": "single",
       "name": "TrueHue Veneer Validator",
       "shortName": "TrueHue",
-      "themeColor": "#6A3FD1",
+      "themeColor": "#24473D",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [

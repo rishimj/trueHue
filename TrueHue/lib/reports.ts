@@ -63,7 +63,8 @@ export async function fetchReports(): Promise<Report[]> {
         woodLabel: String(data.Wood ?? ""),
         inRange: accuracy.startsWith("in"),
         category: data.Category ?? null,
-        confidence: data.Confidence ?? null,
+        // Reports saved before v1.1 stored the score as ValidationProbability.
+        confidence: data.Confidence ?? data.ValidationProbability ?? null,
         imageUrl: data.Image ?? null,
       };
     })

@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { Button, Card, ImagePreview, Screen } from "@/components/ui";
+import { DemoGallery, SamplePicker } from "@/components/samples";
+import { Button, Card, Columns, ImagePreview, Screen, useIsWide } from "@/components/ui";
 import { showAlert } from "@/lib/alert";
 import { compareVeneers, type Comparison } from "@/lib/api";
+import { loadDemoSample, type DemoSample } from "@/lib/demoSamples";
 import { pickImage, type ImageSource, type PickedImage } from "@/lib/pickImage";
 import { notify, useSettings, useStrings, useThemeColors, type ThemeColors } from "@/lib/settings";
 
@@ -17,37 +19,59 @@ function differenceColor(value: number, colors: ThemeColors) {
   return colors.danger;
 }
 
+type Slot = 0 | 1;
+interface SlotState {
+  image: PickedImage;
+  demoId: string | null;
+}
+
 export default function CompareScreen() {
   const { settings } = useSettings();
   const t = useStrings();
   const colors = useThemeColors();
+  const wide = useIsWide();
 
-  const [images, setImages] = useState<[PickedImage | null, PickedImage | null]>([null, null]);
+  const [slots, setSlots] = useState<[SlotState | null, SlotState | null]>([null, null]);
+  const [loadingDemo, setLoadingDemo] = useState<{ slot: Slot; id: string } | null>(null);
   const [result, setResult] = useState<Comparison | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const selectImage = async (slot: 0 | 1, source: ImageSource) => {
+  const setSlot = (slot: Slot, state: SlotState) => {
+    setSlots((current) => {
+      const next: typeof current = [...current];
+      next[slot] = state;
+      return next;
+    });
+    setResult(null);
+  };
+
+  const selectImage = async (slot: Slot, source: ImageSource) => {
     try {
       const picked = await pickImage(source);
-      if (!picked) return;
-      setImages((current) => {
-        const next: typeof current = [...current];
-        next[slot] = picked;
-        return next;
-      });
-      setResult(null);
+      if (picked) setSlot(slot, { image: picked, demoId: null });
     } catch (error) {
       showAlert(t.error, (error as Error).message);
     }
   };
 
-  const [first, second] = images;
+  const selectDemo = async (slot: Slot, sample: DemoSample) => {
+    setLoadingDemo({ slot, id: sample.id });
+    try {
+      setSlot(slot, { image: await loadDemoSample(sample), demoId: sample.id });
+    } catch (error) {
+      showAlert(t.error, (error as Error).message);
+    } finally {
+      setLoadingDemo(null);
+    }
+  };
+
+  const [first, second] = slots;
 
   const compare = async () => {
     if (!first || !second) return;
     setLoading(true);
     try {
-      setResult(await compareVeneers(first.base64, second.base64));
+      setResult(await compareVeneers(first.image.base64, second.image.base64));
       notify(t.compareNotification, t.compareNotificationBody, settings);
     } catch (error) {
       showAlert(t.compareFailed, (error as Error).message);
@@ -57,7 +81,7 @@ export default function CompareScreen() {
   };
 
   const reset = () => {
-    setImages([null, null]);
+    setSlots([null, null]);
     setResult(null);
   };
 
@@ -70,61 +94,78 @@ export default function CompareScreen() {
       ? t.moderateDifference
       : t.significantDifference;
 
+  const slotCard = (slot: Slot) => {
+    const state = slots[slot];
+    return (
+      <Card key={slot} step={slot + 1} title={slot === 0 ? t.veneerSample1 : t.veneerSample2}>
+        {state ? (
+          <>
+            <ImagePreview uri={state.image.uri} />
+            <Button
+              label={t.changeImage}
+              icon="swap-horizontal"
+              variant="secondary"
+              onPress={() => selectImage(slot, "library")}
+            />
+          </>
+        ) : (
+          <SamplePicker compact onPick={(source) => selectImage(slot, source)} />
+        )}
+        <DemoGallery
+          compact
+          onSelect={(sample) => selectDemo(slot, sample)}
+          selectedId={state?.demoId}
+          loadingId={loadingDemo?.slot === slot ? loadingDemo.id : null}
+        />
+      </Card>
+    );
+  };
+
   return (
     <Screen title={t.compareTitle} subtitle={t.compareInstruction}>
-      {([0, 1] as const).map((slot) => {
-        const image = images[slot];
-        return (
-          <Card key={slot} title={slot === 0 ? t.veneerSample1 : t.veneerSample2}>
-            {image ? (
-              <>
-                <ImagePreview uri={image.uri} />
-                <Button label={t.changeImage} variant="secondary" onPress={() => selectImage(slot, "library")} />
-              </>
-            ) : (
-              <>
-                <Button label={t.chooseGallery} onPress={() => selectImage(slot, "library")} />
-                <Button label={t.takePhoto} variant="secondary" onPress={() => selectImage(slot, "camera")} />
-              </>
-            )}
-          </Card>
-        );
-      })}
+      <Columns>
+        {slotCard(0)}
+        {slotCard(1)}
+      </Columns>
 
-      {(first || second) && (
-        <View style={styles.actions}>
+      <View style={[styles.actions, wide && styles.actionsWide]}>
+        <View style={wide ? styles.actionMain : undefined}>
           <Button
             label={loading ? t.calculating : t.calculateDifference}
+            icon="git-compare-outline"
             onPress={compare}
             disabled={!first || !second}
             loading={loading}
           />
-          <Button label={t.reset} variant="ghost" onPress={reset} />
         </View>
-      )}
+        {first || second ? <Button label={t.reset} variant="ghost" onPress={reset} /> : null}
+      </View>
 
       {result && (
         <Card title={t.comparisonResults}>
-          <View style={styles.center}>
-            <View style={[styles.scoreCircle, { backgroundColor: color }]}>
-              <Text style={styles.scoreText}>{value.toFixed(1)}</Text>
+          <View style={[styles.resultBody, wide && styles.resultBodyWide]}>
+            <View style={styles.center}>
+              <View style={[styles.scoreCircle, { borderColor: color, backgroundColor: `${color}14` }]}>
+                <Text style={[styles.scoreText, { color }]}>{value.toFixed(1)}</Text>
+                <Text style={[styles.scoreUnit, { color: colors.secondaryText }]}>/ 100</Text>
+              </View>
+              <Text style={{ color: colors.secondaryText, fontSize: 13 }}>{t.rgbDifference}</Text>
             </View>
-            <Text style={{ color: colors.secondaryText }}>{t.rgbDifference}</Text>
-          </View>
 
-          <View style={[styles.track, { backgroundColor: colors.track }]}>
-            <View style={[styles.fill, { width: `${Math.min(100, value)}%`, backgroundColor: color }]} />
-          </View>
-          <View style={styles.labels}>
-            <Text style={{ color: colors.success }}>{t.similar}</Text>
-            <Text style={{ color: colors.danger }}>{t.different}</Text>
-          </View>
-
-          <Text style={[styles.interpretation, { color: colors.text }]}>{interpretation}</Text>
-
-          <View style={[styles.infoBox, { backgroundColor: colors.track }]}>
-            <Text style={[styles.infoTitle, { color: colors.text }]}>{t.whatDoesItMean}</Text>
-            <Text style={{ color: colors.secondaryText, lineHeight: 20 }}>{t.explanation}</Text>
+            <View style={[styles.resultText, wide && styles.flex]}>
+              <Text style={[styles.interpretation, { color: colors.text }]}>{interpretation}</Text>
+              <View style={[styles.track, { backgroundColor: colors.track }]}>
+                <View style={[styles.fill, { width: `${Math.min(100, value)}%`, backgroundColor: color }]} />
+              </View>
+              <View style={styles.labels}>
+                <Text style={{ color: colors.success, fontSize: 13 }}>{t.similar}</Text>
+                <Text style={{ color: colors.danger, fontSize: 13 }}>{t.different}</Text>
+              </View>
+              <View style={[styles.infoBox, { backgroundColor: colors.track }]}>
+                <Text style={[styles.infoTitle, { color: colors.text }]}>{t.whatDoesItMean}</Text>
+                <Text style={{ color: colors.secondaryText, lineHeight: 19, fontSize: 13 }}>{t.explanation}</Text>
+              </View>
+            </View>
           </View>
         </Card>
       )}
@@ -133,14 +174,28 @@ export default function CompareScreen() {
 }
 
 const styles = StyleSheet.create({
-  actions: { gap: 12 },
+  flex: { flex: 1 },
+  actions: { gap: 8 },
+  actionsWide: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 12 },
+  actionMain: { width: 320 },
+  resultBody: { gap: 20 },
+  resultBodyWide: { flexDirection: "row", alignItems: "center", gap: 32 },
+  resultText: { gap: 10 },
   center: { alignItems: "center", gap: 8 },
-  scoreCircle: { width: 96, height: 96, borderRadius: 48, alignItems: "center", justifyContent: "center" },
-  scoreText: { color: "#fff", fontSize: 24, fontWeight: "700" },
-  track: { height: 12, borderRadius: 6, overflow: "hidden" },
+  scoreCircle: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    borderWidth: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scoreText: { fontSize: 32, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  scoreUnit: { fontSize: 12 },
+  track: { height: 10, borderRadius: 5, overflow: "hidden" },
   fill: { height: "100%" },
   labels: { flexDirection: "row", justifyContent: "space-between" },
-  interpretation: { fontSize: 16, fontWeight: "500", textAlign: "center" },
-  infoBox: { borderRadius: 12, padding: 16, gap: 8 },
-  infoTitle: { fontSize: 16, fontWeight: "600" },
+  interpretation: { fontSize: 17, fontWeight: "600" },
+  infoBox: { borderRadius: 12, padding: 14, gap: 6, marginTop: 4 },
+  infoTitle: { fontSize: 14, fontWeight: "600" },
 });
